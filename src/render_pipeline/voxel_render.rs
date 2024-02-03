@@ -101,7 +101,10 @@ fn prepare_instance_buffers(
         let position = pos.as_vec3() - (1 << gpu_voxel_world.brickmap_depth - 1) as f32;
         let scale = (1 << gpu_voxel_world.brickmap_depth - depth) as f32;
         if depth > gpu_voxel_world.brickmap_depth {
-            error!("depth {} > {}. this is probably really bad", depth, gpu_voxel_world.brickmap_depth);
+            error!(
+                "depth {} > {}. this is probably really bad",
+                depth, gpu_voxel_world.brickmap_depth
+            );
             return;
         }
         let brick = gpu_voxel_world.brickmap[index] - BRICK_OFFSET;
@@ -285,9 +288,8 @@ impl<P: PhaseItem> RenderCommand<P> for DrawVoxelPhase {
         let Some(mesh_instance) = render_mesh_instances.get(&item.entity()) else {
             return RenderCommandResult::Failure;
         };
-        let gpu_mesh = match meshes.into_inner().get(mesh_instance.mesh_asset_id) {
-            Some(gpu_mesh) => gpu_mesh,
-            None => return RenderCommandResult::Failure,
+        let Some(gpu_mesh) = meshes.into_inner().get(mesh_instance.mesh_asset_id) else {
+            return RenderCommandResult::Failure;
         };
 
         pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));

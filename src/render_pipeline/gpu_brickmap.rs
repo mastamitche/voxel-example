@@ -56,22 +56,21 @@ impl GpuVoxelWorld {
         voxel_data: &VoxelData,
         render_queue: &RenderQueue,
     ) -> Result<usize> {
-        let brick_index = self.brick_holes.pop_front();
-        if brick_index.is_none() {
+        let Some(brick_index) = self.brick_holes.pop_front() else {
             return Err(anyhow::anyhow!("ran out of space in brickmap"));
-        }
+        };
 
         render_queue.write_buffer(
             &voxel_data.bricks,
-            (brick_index.unwrap() * 4 * Brick::brick_ints()) as u64,
+            (brick_index * 4 * Brick::brick_ints()) as u64,
             &brick.get_bitmask(),
         );
 
         let dim = self.color_texture_size / BRICK_SIZE;
         let brick_pos = UVec3::new(
-            brick_index.unwrap() as u32 / (dim.x * dim.y),
-            brick_index.unwrap() as u32 / dim.x % dim.y,
-            brick_index.unwrap() as u32 % dim.x,
+            brick_index as u32 / (dim.x * dim.y),
+            brick_index as u32 / dim.x % dim.y,
+            brick_index as u32 % dim.x,
         ) * BRICK_SIZE;
         render_queue.write_texture(
             ImageCopyTexture {
@@ -97,7 +96,7 @@ impl GpuVoxelWorld {
             },
         );
 
-        Ok(brick_index.unwrap())
+        Ok(brick_index)
     }
 
     pub fn divide_node(

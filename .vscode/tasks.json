@@ -13,8 +13,10 @@
             "args": [
                 "run",
                 "--release",
-                "--bin",
-                "voxelize",
+                "--features",
+                "bevy/file_watcher",
+                // "--bin",
+                // "voxelize",
             ],
             "problemMatcher": [
                 "$rustc"
