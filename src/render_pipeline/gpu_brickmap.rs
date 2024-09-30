@@ -1,7 +1,7 @@
 use anyhow::Result;
 use bevy::{prelude::*, render::renderer::RenderQueue};
 use std::collections::VecDeque;
-use wgpu::ImageCopyTexture;
+use wgpu::ImageCopyTextureBase;
 
 use super::{
     cpu_brickmap::Brick,
@@ -74,7 +74,7 @@ impl GpuVoxelWorld {
             brick_index.unwrap() as u32 % dim.x,
         ) * BRICK_SIZE;
         render_queue.write_texture(
-            ImageCopyTexture {
+            wgpu::ImageCopyTextureBase {
                 texture: &voxel_data.color,
                 origin: wgpu::Origin3d {
                     x: brick_pos.x,

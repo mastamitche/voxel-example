@@ -54,7 +54,7 @@ fn toggle_grab_cursor(window: &mut Window) {
 
 fn update_character(
     mut character: Query<(&mut Transform, &mut CharacterEntity)>,
-    keys: Res<Input<KeyCode>>,
+    keys: Res<ButtonInput<KeyCode>>,
     mut mouse_motion_events: EventReader<MouseMotion>,
     time: Res<Time>,
     mut primary_query: Query<&mut Window, With<PrimaryWindow>>,
@@ -85,7 +85,7 @@ fn update_character(
             // Order is important to prevent unintended roll
             character.look_at = Quat::from_axis_angle(Vec3::Y, -mouse_delta.x * SENSITIVITY)
                 * Quat::from_axis_angle(
-                    transform.local_x(),
+                    transform.local_x().into(),
                     (-mouse_delta.y * SENSITIVITY)
                         .min(angle - max_angle)
                         .max(angle + max_angle - std::f32::consts::PI),
@@ -98,9 +98,9 @@ fn update_character(
 
         // movement
         let mut input = Vec3::new(
-            (keys.pressed(KeyCode::D) as i32 - keys.pressed(KeyCode::A) as i32) as f32,
+            (keys.pressed(KeyCode::KeyD) as i32 - keys.pressed(KeyCode::KeyA) as i32) as f32,
             (keys.pressed(KeyCode::Space) as i32 - keys.pressed(KeyCode::ShiftLeft) as i32) as f32,
-            (keys.pressed(KeyCode::S) as i32 - keys.pressed(KeyCode::W) as i32) as f32,
+            (keys.pressed(KeyCode::KeyS) as i32 - keys.pressed(KeyCode::KeyW) as i32) as f32,
         );
         if input != Vec3::ZERO {
             input = input.normalize();

@@ -1,16 +1,21 @@
 use bevy::{
     core_pipeline::{bloom::BloomSettings, fxaa::Fxaa, tonemapping::Tonemapping},
+    log::{Level, LogPlugin},
     prelude::*,
     render::{
         camera::RenderTarget,
+        render_asset::RenderAssetUsages,
         render_resource::*,
+        settings::{RenderCreation, WgpuSettings},
         texture::{ImageSampler, ImageSamplerDescriptor},
+        RenderPlugin,
     },
     window::{PrimaryWindow, WindowResized, WindowScaleFactorChanged},
 };
 // use bevy_atmosphere::prelude::*;
 use character::CharacterEntity;
 use render_pipeline::{VoxelVolume, VoxelVolumeBundle};
+use wgpu::Backends;
 
 mod character;
 mod render_pipeline;
@@ -19,13 +24,28 @@ mod ui;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    resolution: (1920.0, 1080.0).into(),
+            DefaultPlugins
+                .set(RenderPlugin {
+                    render_creation: RenderCreation::Automatic(WgpuSettings {
+                        backends: Some(
+                            Backends::BROWSER_WEBGPU
+                                | Backends::GL
+                                | Backends::VULKAN
+                                | Backends::METAL,
+                        ),
+                        ..default()
+                    }),
+
+                    ..default()
+                })
+                .set(LogPlugin {
+                    level: Level::WARN, // Change to Level::TRACE for more verbosity
+                    ..default()
+                })
+                .set(WindowPlugin {
+                    primary_window: Some(Window { ..default() }),
                     ..default()
                 }),
-                ..default()
-            }),
             // AtmospherePlugin,
             render_pipeline::VoxelPlugin,
             character::CharacterPlugin,
@@ -55,6 +75,7 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
         TextureDimension::D2,
         &[0u8; 8],
         TextureFormat::Rgba16Float,
+        RenderAssetUsages::default(),
     );
     render_texture.texture_descriptor.usage =
         TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT;
@@ -86,7 +107,7 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
             ..default()
         },
         CharacterEntity {
-            look_at: -character_transform.local_z(),
+            look_at: Vec3::from(-character_transform.local_z()),
             ..default()
         },
         BloomSettings::default(),
