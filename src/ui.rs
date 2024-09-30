@@ -47,8 +47,8 @@ fn ui_system(
 ) {
     let mut character_entity = character.single_mut();
 
-    egui::Window::new("Settings").show(contexts.ctx_for_window_mut(window.single()), |ui| {
-        if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
+    egui::Window::new("Settings").show(contexts.ctx_for_entity_mut(window.single()), |ui| {
+        if let Some(fps) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS) {
             if let Some(measurement) = fps.measurement() {
                 fps_data.push_back(measurement.value);
                 if fps_data.len() > 100 {
