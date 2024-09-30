@@ -107,7 +107,7 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
             ..default()
         },
         CharacterEntity {
-            look_at: -character_transform.translation,
+            look_at: Vec3::from(-character_transform.local_z()),
             ..default()
         },
         BloomSettings::default(),
