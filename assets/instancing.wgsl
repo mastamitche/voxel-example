@@ -1,7 +1,7 @@
 #import bevy_pbr::{
     mesh_view_bindings::view,
     mesh_functions::{
-        get_model_matrix,
+        get_world_from_local,
         mesh_position_local_to_clip,
     },
     view_transformations::direction_clip_to_world,
@@ -32,11 +32,11 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     // the 0.9999 avoids z-fighting with the backface
     let position = 0.9999 * vertex.position * vertex.pos_scale.w + vertex.pos_scale.xyz;
 
-    // NOTE: Passing 0 as the instance_index to get_model_matrix() is a hack
+    // NOTE: Passing 0 as the instance_index to get_world_from_local() is a hack
     // for this example as the instance_index builtin would map to the wrong
     // index in the Mesh array. This index could be passed in via another
     // uniform instead but it's unnecessary for the example.
-    let clip_pos = mesh_position_local_to_clip(get_model_matrix(0u), vec4<f32>(position, 1.0));
+    let clip_pos = mesh_position_local_to_clip(get_world_from_local(0u), vec4<f32>(position, 1.0));
 
     var out: VertexOutput;
     out.clip_pos = clip_pos;

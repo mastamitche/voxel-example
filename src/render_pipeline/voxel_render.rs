@@ -4,24 +4,25 @@ use super::{
     VoxelVolume, BRICK_OFFSET,
 };
 use bevy::{
-    core_pipeline::core_3d::Opaque3d,
+    asset::UntypedAssetId,
+    core_pipeline::core_3d::{Opaque3d, Opaque3dBinKey, Transparent3d},
     ecs::system::{lifetimeless::*, SystemParamItem},
     pbr::{
         MeshPipeline, MeshPipelineKey, RenderMeshInstances, SetMeshBindGroup, SetMeshViewBindGroup,
     },
     prelude::*,
-    render::RenderApp,
     render::{
-        mesh::{GpuBufferInfo, MeshVertexBufferLayout},
+        mesh::{GpuBufferInfo, GpuMesh, MeshVertexBufferLayout, MeshVertexBufferLayoutRef},
         render_asset::RenderAssets,
         render_phase::{
-            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
-            RenderPhase, SetItemPipeline, TrackedRenderPass,
+            AddRenderCommand, BinnedPhaseItem, BinnedRenderPhase, BinnedRenderPhaseType,
+            DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand, RenderCommandResult,
+            SetItemPipeline, TrackedRenderPass, ViewBinnedRenderPhases, ViewSortedRenderPhases,
         },
         render_resource::*,
         renderer::RenderDevice,
         view::ExtractedView,
-        Render, RenderSet,
+        Render, RenderApp, RenderSet,
     },
 };
 use bytemuck::{Pod, Zeroable};
@@ -33,7 +34,7 @@ impl Plugin for VoxelRenderPlugin {
         app.init_resource::<CubeHandle>()
             .add_systems(PostUpdate, add_mesh_handles);
         app.sub_app_mut(RenderApp)
-            .add_render_command::<Opaque3d, DrawVoxel>()
+            .add_render_command::<Transparent3d, DrawVoxel>()
             .init_resource::<SpecializedMeshPipelines<VoxelPipeline>>()
             .add_systems(
                 Render,
@@ -55,7 +56,7 @@ struct CubeHandle(Handle<Mesh>);
 impl FromWorld for CubeHandle {
     fn from_world(world: &mut World) -> Self {
         let mut meshes = world.resource_mut::<Assets<Mesh>>();
-        CubeHandle(meshes.add(Mesh::from(shape::Box::from_corners(Vec3::ZERO, Vec3::ONE))))
+        CubeHandle(meshes.add(Mesh::from(Cuboid::from_corners(Vec3::ZERO, Vec3::ONE))))
     }
 }
 
@@ -101,7 +102,10 @@ fn prepare_instance_buffers(
         let position = pos.as_vec3() - (1 << gpu_voxel_world.brickmap_depth - 1) as f32;
         let scale = (1 << gpu_voxel_world.brickmap_depth - depth) as f32;
         if depth > gpu_voxel_world.brickmap_depth {
-            error!("depth {} > {}. this is probably really bad", depth, gpu_voxel_world.brickmap_depth);
+            error!(
+                "depth {} > {}. this is probably really bad",
+                depth, gpu_voxel_world.brickmap_depth
+            );
             return;
         }
         let brick = gpu_voxel_world.brickmap[index] - BRICK_OFFSET;
@@ -138,43 +142,57 @@ fn prepare_instance_buffers(
 }
 
 fn queue_custom(
-    opaque_3d_draw_functions: Res<DrawFunctions<Opaque3d>>,
+    opaque_3d_draw_functions: Res<DrawFunctions<Transparent3d>>,
     custom_pipeline: Res<VoxelPipeline>,
     msaa: Res<Msaa>,
     mut pipelines: ResMut<SpecializedMeshPipelines<VoxelPipeline>>,
     pipeline_cache: Res<PipelineCache>,
-    meshes: Res<RenderAssets<Mesh>>,
+    meshes: Res<RenderAssets<GpuMesh>>,
     render_mesh_instances: Res<RenderMeshInstances>,
     voxel_volumes: Query<Entity, With<VoxelVolume>>,
-    mut views: Query<(&ExtractedView, &mut RenderPhase<Opaque3d>)>,
+    mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Transparent3d>>,
+    mut views: Query<(Entity, &ExtractedView)>,
 ) {
     let draw_custom = opaque_3d_draw_functions.read().id::<DrawVoxel>();
 
     let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples());
-
-    for (view, mut transparent_phase) in &mut views {
+    for (e, view) in &mut views {
+        let Some(transparent_phase) = transparent_render_phases.get_mut(&e) else {
+            continue;
+        };
         let view_key = msaa_key | MeshPipelineKey::from_hdr(view.hdr);
         let rangefinder = view.rangefinder3d();
         for entity in &voxel_volumes {
-            let Some(mesh_instance) = render_mesh_instances.get(&entity) else {
+            let Some(mesh_instance) = render_mesh_instances.render_mesh_queue_data(entity) else {
                 continue;
             };
             let Some(mesh) = meshes.get(mesh_instance.mesh_asset_id) else {
                 continue;
             };
-            let key = view_key | MeshPipelineKey::from_primitive_topology(mesh.primitive_topology);
+            let key =
+                view_key | MeshPipelineKey::from_primitive_topology(mesh.primitive_topology());
             let pipeline = pipelines
                 .specialize(&pipeline_cache, &custom_pipeline, key, &mesh.layout)
                 .unwrap();
-            transparent_phase.add(Opaque3d {
+
+            let t3d = Transparent3d {
                 entity,
                 pipeline,
                 draw_function: draw_custom,
-                distance: rangefinder
-                    .distance_translation(&mesh_instance.transforms.transform.translation),
+                distance: rangefinder.distance_translation(&mesh_instance.translation),
                 batch_range: 0..1,
-                dynamic_offset: None,
-            });
+                extra_index: PhaseItemExtraIndex(0),
+            };
+            transparent_phase.add(t3d);
+            // let value = Opaque3d::new(
+            //     key,
+            //     entity,
+            //     // distance: rangefinder
+            //     //     .distance_translation(&mesh_instance.transforms.transform.translation),
+            //     0..1,
+            //     PhaseItemExtraIndex::dynamic_offset(0),
+            // );
+            //opaque_phase.add(key, entity, BinnedRenderPhaseType::BatchableMesh);
         }
     }
 }
@@ -209,7 +227,7 @@ impl SpecializedMeshPipeline for VoxelPipeline {
     fn specialize(
         &self,
         key: Self::Key,
-        layout: &MeshVertexBufferLayout,
+        layout: &MeshVertexBufferLayoutRef,
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
         let mut descriptor = self.mesh_pipeline.specialize(key, layout)?;
 
@@ -270,19 +288,20 @@ type DrawVoxel = (
 pub struct DrawVoxelPhase;
 
 impl<P: PhaseItem> RenderCommand<P> for DrawVoxelPhase {
-    type Param = (SRes<RenderAssets<Mesh>>, SRes<RenderMeshInstances>);
-    type ViewWorldQuery = ();
-    type ItemWorldQuery = Read<InstanceBuffer>;
+    type Param = (SRes<RenderAssets<GpuMesh>>, SRes<RenderMeshInstances>);
+    type ViewQuery = ();
+    type ItemQuery = Read<InstanceBuffer>;
 
     #[inline]
     fn render<'w>(
         item: &P,
         _view: (),
-        instance_buffer: &'w InstanceBuffer,
+        instance_buffer: Option<&'w InstanceBuffer>,
         (meshes, render_mesh_instances): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let Some(mesh_instance) = render_mesh_instances.get(&item.entity()) else {
+        let Some(mesh_instance) = render_mesh_instances.render_mesh_queue_data(item.entity())
+        else {
             return RenderCommandResult::Failure;
         };
         let gpu_mesh = match meshes.into_inner().get(mesh_instance.mesh_asset_id) {
@@ -291,19 +310,21 @@ impl<P: PhaseItem> RenderCommand<P> for DrawVoxelPhase {
         };
 
         pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
-        pass.set_vertex_buffer(1, instance_buffer.buffer.slice(..));
+        if let Some(instance_buffer) = instance_buffer {
+            pass.set_vertex_buffer(1, instance_buffer.buffer.slice(..));
 
-        match &gpu_mesh.buffer_info {
-            GpuBufferInfo::Indexed {
-                buffer,
-                index_format,
-                count,
-            } => {
-                pass.set_index_buffer(buffer.slice(..), 0, *index_format);
-                pass.draw_indexed(0..*count, 0, 0..instance_buffer.length as u32);
-            }
-            GpuBufferInfo::NonIndexed => {
-                pass.draw(0..gpu_mesh.vertex_count, 0..instance_buffer.length as u32);
+            match &gpu_mesh.buffer_info {
+                GpuBufferInfo::Indexed {
+                    buffer,
+                    index_format,
+                    count,
+                } => {
+                    pass.set_index_buffer(buffer.slice(..), 0, *index_format);
+                    pass.draw_indexed(0..*count, 0, 0..instance_buffer.length as u32);
+                }
+                GpuBufferInfo::NonIndexed => {
+                    pass.draw(0..gpu_mesh.vertex_count, 0..instance_buffer.length as u32);
+                }
             }
         }
         RenderCommandResult::Success
