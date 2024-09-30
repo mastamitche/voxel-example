@@ -1,7 +1,6 @@
 use anyhow::Result;
 use bevy::{prelude::*, render::renderer::RenderQueue};
 use std::collections::VecDeque;
-use wgpu::ImageCopyTextureBase;
 
 use super::{
     cpu_brickmap::Brick,

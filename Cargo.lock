@@ -523,6 +523,7 @@ version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ee4222406637f3c8e3991a99788cfcde76097bf997c311f1b6297364057483f"
 dependencies = [
+ "arrayvec",
  "bevy_ecs_macros",
  "bevy_ptr",
  "bevy_reflect",
@@ -933,7 +934,9 @@ version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77865f310b1fc48fb05b7c4adbe76607ec01d0c14f8ab4caba4d714c86439946"
 dependencies = [
+ "async-channel",
  "async-executor",
+ "concurrent-queue",
  "futures-lite",
  "wasm-bindgen-futures",
 ]

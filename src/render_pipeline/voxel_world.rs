@@ -9,14 +9,12 @@ use bevy::{
     prelude::*,
     render::{
         extract_resource::ExtractResource,
-        render_asset::RenderAssetUsages,
         render_phase::{PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass},
         render_resource::*,
         renderer::{RenderDevice, RenderQueue},
         Render, RenderApp, RenderSet,
     },
 };
-use bevy_egui::egui::TextBuffer;
 use std::{
     collections::VecDeque,
     path::PathBuf,

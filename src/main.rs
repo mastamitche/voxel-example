@@ -1,21 +1,17 @@
 use bevy::{
     core_pipeline::{bloom::BloomSettings, fxaa::Fxaa, tonemapping::Tonemapping},
-    log::{Level, LogPlugin},
     prelude::*,
     render::{
         camera::RenderTarget,
         render_asset::RenderAssetUsages,
         render_resource::*,
-        settings::{RenderCreation, WgpuSettings},
         texture::{ImageSampler, ImageSamplerDescriptor},
-        RenderPlugin,
     },
     window::{PrimaryWindow, WindowResized, WindowScaleFactorChanged},
 };
 // use bevy_atmosphere::prelude::*;
 use character::CharacterEntity;
 use render_pipeline::{VoxelVolume, VoxelVolumeBundle};
-use wgpu::Backends;
 
 mod character;
 mod render_pipeline;
@@ -24,28 +20,7 @@ mod ui;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins
-                .set(RenderPlugin {
-                    render_creation: RenderCreation::Automatic(WgpuSettings {
-                        backends: Some(
-                            Backends::BROWSER_WEBGPU
-                                | Backends::GL
-                                | Backends::VULKAN
-                                | Backends::METAL,
-                        ),
-                        ..default()
-                    }),
-
-                    ..default()
-                })
-                .set(LogPlugin {
-                    level: Level::WARN, // Change to Level::TRACE for more verbosity
-                    ..default()
-                })
-                .set(WindowPlugin {
-                    primary_window: Some(Window { ..default() }),
-                    ..default()
-                }),
+            DefaultPlugins,
             // AtmospherePlugin,
             render_pipeline::VoxelPlugin,
             character::CharacterPlugin,

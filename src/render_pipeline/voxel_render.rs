@@ -4,20 +4,18 @@ use super::{
     VoxelVolume, BRICK_OFFSET,
 };
 use bevy::{
-    asset::UntypedAssetId,
-    core_pipeline::core_3d::{Opaque3d, Opaque3dBinKey, Transparent3d},
+    core_pipeline::core_3d::Transparent3d,
     ecs::system::{lifetimeless::*, SystemParamItem},
     pbr::{
         MeshPipeline, MeshPipelineKey, RenderMeshInstances, SetMeshBindGroup, SetMeshViewBindGroup,
     },
     prelude::*,
     render::{
-        mesh::{GpuBufferInfo, GpuMesh, MeshVertexBufferLayout, MeshVertexBufferLayoutRef},
-        render_asset::RenderAssets,
+        mesh::{GpuBufferInfo, GpuMesh, Indices, MeshVertexBufferLayoutRef},
+        render_asset::{RenderAssetUsages, RenderAssets},
         render_phase::{
-            AddRenderCommand, BinnedPhaseItem, BinnedRenderPhase, BinnedRenderPhaseType,
-            DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand, RenderCommandResult,
-            SetItemPipeline, TrackedRenderPass, ViewBinnedRenderPhases, ViewSortedRenderPhases,
+            AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand,
+            RenderCommandResult, SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
         },
         render_resource::*,
         renderer::RenderDevice,
@@ -56,7 +54,7 @@ struct CubeHandle(Handle<Mesh>);
 impl FromWorld for CubeHandle {
     fn from_world(world: &mut World) -> Self {
         let mut meshes = world.resource_mut::<Assets<Mesh>>();
-        CubeHandle(meshes.add(Mesh::from(Cuboid::from_corners(Vec3::ZERO, Vec3::ONE))))
+        CubeHandle(meshes.add(Mesh::from(Cube)))
     }
 }
 
@@ -327,5 +325,71 @@ impl<P: PhaseItem> RenderCommand<P> for DrawVoxelPhase {
             }
         }
         RenderCommandResult::Success
+    }
+}
+
+// copied from bevy as cuboid only allows half_size not min/max
+pub struct Cube;
+
+impl MeshBuilder for Cube {
+    fn build(&self) -> Mesh {
+        let min = Vec3::ZERO;
+        let max = Vec3::ONE;
+
+        // Suppose Y-up right hand, and camera look from +Z to -Z
+        let vertices = &[
+            // Front
+            ([min.x, min.y, max.z], [0.0, 0.0, 1.0], [0.0, 0.0]),
+            ([max.x, min.y, max.z], [0.0, 0.0, 1.0], [1.0, 0.0]),
+            ([max.x, max.y, max.z], [0.0, 0.0, 1.0], [1.0, 1.0]),
+            ([min.x, max.y, max.z], [0.0, 0.0, 1.0], [0.0, 1.0]),
+            // Back
+            ([min.x, max.y, min.z], [0.0, 0.0, -1.0], [1.0, 0.0]),
+            ([max.x, max.y, min.z], [0.0, 0.0, -1.0], [0.0, 0.0]),
+            ([max.x, min.y, min.z], [0.0, 0.0, -1.0], [0.0, 1.0]),
+            ([min.x, min.y, min.z], [0.0, 0.0, -1.0], [1.0, 1.0]),
+            // Right
+            ([max.x, min.y, min.z], [1.0, 0.0, 0.0], [0.0, 0.0]),
+            ([max.x, max.y, min.z], [1.0, 0.0, 0.0], [1.0, 0.0]),
+            ([max.x, max.y, max.z], [1.0, 0.0, 0.0], [1.0, 1.0]),
+            ([max.x, min.y, max.z], [1.0, 0.0, 0.0], [0.0, 1.0]),
+            // Left
+            ([min.x, min.y, max.z], [-1.0, 0.0, 0.0], [1.0, 0.0]),
+            ([min.x, max.y, max.z], [-1.0, 0.0, 0.0], [0.0, 0.0]),
+            ([min.x, max.y, min.z], [-1.0, 0.0, 0.0], [0.0, 1.0]),
+            ([min.x, min.y, min.z], [-1.0, 0.0, 0.0], [1.0, 1.0]),
+            // Top
+            ([max.x, max.y, min.z], [0.0, 1.0, 0.0], [1.0, 0.0]),
+            ([min.x, max.y, min.z], [0.0, 1.0, 0.0], [0.0, 0.0]),
+            ([min.x, max.y, max.z], [0.0, 1.0, 0.0], [0.0, 1.0]),
+            ([max.x, max.y, max.z], [0.0, 1.0, 0.0], [1.0, 1.0]),
+            // Bottom
+            ([max.x, min.y, max.z], [0.0, -1.0, 0.0], [0.0, 0.0]),
+            ([min.x, min.y, max.z], [0.0, -1.0, 0.0], [1.0, 0.0]),
+            ([min.x, min.y, min.z], [0.0, -1.0, 0.0], [1.0, 1.0]),
+            ([max.x, min.y, min.z], [0.0, -1.0, 0.0], [0.0, 1.0]),
+        ];
+
+        let positions: Vec<_> = vertices.iter().map(|(p, _, _)| *p).collect();
+        let normals: Vec<_> = vertices.iter().map(|(_, n, _)| *n).collect();
+        let uvs: Vec<_> = vertices.iter().map(|(_, _, uv)| *uv).collect();
+
+        let indices = Indices::U32(vec![
+            0, 1, 2, 2, 3, 0, // front
+            4, 5, 6, 6, 7, 4, // back
+            8, 9, 10, 10, 11, 8, // right
+            12, 13, 14, 14, 15, 12, // left
+            16, 17, 18, 18, 19, 16, // top
+            20, 21, 22, 22, 23, 20, // bottom
+        ]);
+
+        Mesh::new(
+            PrimitiveTopology::TriangleList,
+            RenderAssetUsages::default(),
+        )
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+        .with_inserted_indices(indices)
     }
 }
