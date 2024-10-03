@@ -37,8 +37,8 @@ pub fn load_anvil(region_path: PathBuf, world_depth: u32) -> CpuBrickmap {
     let side_length_chunks = side_length / 16;
     let side_length_regions = (side_length_chunks / 32).max(1);
     let half_side_length_regions: i32 = side_length_regions / 2;
-    'outer: for region_x in -half_side_length_regions..half_side_length_regions.max(1) {
-        for region_z in -half_side_length_regions..half_side_length_regions.max(1) {
+    'outer: for region_x in -half_side_length_regions..half_side_length_regions.max(4) {
+        for region_z in -half_side_length_regions..half_side_length_regions.max(4) {
             let path = region_path.join(format!("r.{}.{}.mca", region_x, region_z));
             if let Ok(file) = std::fs::File::open(path.clone()) {
                 info!("loading region {}", path.display());

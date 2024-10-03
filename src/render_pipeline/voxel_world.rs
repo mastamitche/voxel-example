@@ -1,7 +1,8 @@
 use super::{
     cpu_brickmap::{Brick, CpuBrickmap},
     gpu_brickmap::GpuVoxelWorld,
-    load_anvil::load_anvil,
+    height_mapper::load_and_process_heightmap,
+    world_builder::setup_voxels,
     BRICK_OFFSET, BRICK_SIZE, COUNTER_BITS,
 };
 use bevy::{
@@ -21,6 +22,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+const REGION_SIZE: usize = 512; // Blocks per region along one axis
+
+fn calculate_num_regions(image_size: usize) -> usize {
+    ((image_size as f32) / (REGION_SIZE as f32)).ceil() as usize
+}
+
 #[derive(Resource, Deref, DerefMut)]
 pub struct CpuVoxelWorld(CpuBrickmap);
 
@@ -36,15 +43,18 @@ impl Plugin for VoxelWorldPlugin {
     fn finish(&self, app: &mut App) {
         let render_device = app.world().resource::<RenderDevice>();
         let render_queue = app.world().resource::<RenderQueue>();
+        let heightmap = load_and_process_heightmap();
+        if heightmap.is_none() {
+            error!("Failed to load heightmap");
+            return;
+        }
+        let heightmap = heightmap.unwrap();
 
         // brickmap settings
-        let world_depth = 9;
+        let world_depth = 8;
         let color_texture_size = UVec3::splat(640);
         let brickmap_max_nodes = 1 << 16;
-
-        // load world (slooowwww)
-        let path = PathBuf::from("assets/worlds/imperial_city");
-        let mut cpu_brickmap = load_anvil(path, world_depth);
+        let mut cpu_brickmap = setup_voxels(heightmap, world_depth);
         cpu_brickmap.recreate_mipmaps();
 
         // setup gpu brickmap

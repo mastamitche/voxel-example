@@ -5,22 +5,37 @@ use bevy::{
         camera::RenderTarget,
         render_asset::RenderAssetUsages,
         render_resource::*,
+        settings::{RenderCreation, WgpuSettings},
         texture::{ImageSampler, ImageSamplerDescriptor},
+        RenderPlugin,
     },
     window::{PrimaryWindow, WindowResized, WindowScaleFactorChanged},
 };
 // use bevy_atmosphere::prelude::*;
 use character::CharacterEntity;
 use render_pipeline::{VoxelVolume, VoxelVolumeBundle};
+use wgpu::Backends;
 
 mod character;
 mod render_pipeline;
 mod ui;
+mod ultilities;
 
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.set(RenderPlugin {
+                render_creation: RenderCreation::Automatic(WgpuSettings {
+                    backends: Some(
+                        Backends::BROWSER_WEBGPU
+                            | Backends::GL
+                            | Backends::VULKAN
+                            | Backends::METAL,
+                    ),
+                    ..default()
+                }),
+                ..default()
+            }),
             // AtmospherePlugin,
             render_pipeline::VoxelPlugin,
             character::CharacterPlugin,

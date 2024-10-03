@@ -14,10 +14,12 @@ use bevy::{
 
 mod cpu_brickmap;
 mod gpu_brickmap;
+mod height_mapper;
 mod load_anvil;
 mod voxel_render;
 mod voxel_streaming;
 mod voxel_world;
+mod world_builder;
 
 pub const BRICK_SIZE: u32 = 16;
 pub const BRICK_OFFSET: u32 = 1 << 31;

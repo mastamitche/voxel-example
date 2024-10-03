@@ -1,11 +1,17 @@
 use super::BRICK_SIZE;
 use bevy::prelude::*;
+use rayon::prelude::*;
+use std::{
+    ops::DerefMut,
+    sync::{Arc, Mutex},
+};
 
+#[derive(Copy, Clone, Debug)]
 pub struct Brick {
     data: [[u8; 4]; (BRICK_SIZE * BRICK_SIZE * BRICK_SIZE) as usize],
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Node {
     pub children: u32,
     pub brick: u32,
@@ -18,6 +24,7 @@ impl Node {
     };
 }
 
+#[derive(Debug)]
 pub struct CpuBrickmap {
     pub brickmap: Vec<Node>,
     pub brickmap_depth: u32,
@@ -32,6 +39,17 @@ impl CpuBrickmap {
             brickmap_depth,
             bricks: vec![Brick::empty()],
         }
+    }
+    pub fn place_bricks(&mut self, bricks_to_insert: Vec<(Brick, UVec3)>) -> Result<(), String> {
+        let brickmap = Arc::new(Mutex::new(self));
+
+        bricks_to_insert.par_iter().try_for_each(|(brick, pos)| {
+            let mut brickmap = brickmap.lock().unwrap();
+            brickmap.place_brick(brick.clone(), *pos)
+        })?;
+
+        // No need to reassign self, as the changes have been made through the mutex
+        Ok(())
     }
 
     pub fn place_brick(&mut self, brick: Brick, pos: UVec3) -> Result<(), String> {
@@ -75,7 +93,6 @@ impl CpuBrickmap {
             node_index = new_node;
         }
     }
-
     pub fn get_node(&self, pos: UVec3, max_depth: Option<u32>) -> (usize, UVec3, u32) {
         let mut node_index = 0;
         let mut node_pos = UVec3::new(0, 0, 0);

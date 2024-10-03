@@ -31,3 +31,8 @@ radsort = "0.1"
 minecraft-assets = "0.0.6"
 crossbeam = "0.8"
 dot_vox = "5.1"
+#might be desktop only
+rayon = "1.7"
+noise ="0.9"
+once_cell="1.18.0"
+image = "0.25"
